@@ -1,0 +1,46 @@
+name: Commits (reusable)
+
+# Shared Conventional Commits check. The changelog and release notes are
+# generated from commit subjects, so the format is enforced rather than
+# encouraged: a commit that does not parse is a change that vanishes from the
+# release notes. Callers own the triggers.
+on:
+  workflow_call:
+    inputs:
+      script-path:
+        description: >-
+          Path, relative to the calling repository root, of the validator
+          script. It is invoked as `bash <script-path> <base-sha> <head-sha>`.
+        required: false
+        type: string
+        default: scripts/check-conventional-commits.sh
+      runs-on:
+        description: Runner label for the check job.
+        required: false
+        type: string
+        default: ubuntu-latest
+      timeout-minutes:
+        description: Job timeout in minutes.
+        required: false
+        type: number
+        default: 5
+
+permissions:
+  contents: read
+
+jobs:
+  conventional:
+    name: Conventional commits
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # Full history so the base..head range can be walked.
+          fetch-depth: 0
+
+      - name: Validate commit subjects
+        run: |
+          bash "${{ inputs.script-path }}" \
+            "${{ github.event.pull_request.base.sha }}" \
+            "${{ github.event.pull_request.head.sha }}"

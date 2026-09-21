@@ -1,0 +1,71 @@
+name: CodeQL (reusable)
+
+# Shared CodeQL analysis. Callers own the triggers (push / pull_request
+# branches and the weekly schedule) so each repository keeps its own cadence
+# visible in its own workflow file; this file owns the analysis itself.
+on:
+  workflow_call:
+    inputs:
+      languages:
+        description: >-
+          JSON array of CodeQL languages to analyse, e.g. '["python"]' or
+          '["csharp","javascript-typescript"]'. One matrix job per entry.
+        required: false
+        type: string
+        default: '["javascript-typescript"]'
+      queries:
+        description: Query suite passed to codeql-action/init.
+        required: false
+        type: string
+        default: security-extended
+      autobuild:
+        description: >-
+          Run codeql-action/autobuild. Leave true for compiled languages.
+          Set false for source-analysed languages (javascript-typescript,
+          python, ruby) where Autobuild has nothing to compile.
+        required: false
+        type: boolean
+        default: true
+      runs-on:
+        description: Runner label for the analysis job.
+        required: false
+        type: string
+        default: ubuntu-latest
+      timeout-minutes:
+        description: Job timeout in minutes.
+        required: false
+        type: number
+        default: 30
+
+# Least privilege: the analysis reads the tree and writes findings, nothing else.
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  analyze:
+    name: Analyze ${{ matrix.language }}
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ${{ fromJSON(inputs.languages) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@977e6ceaea7361825998245d787fa3b4d6b9e5df # codeql-bundle-v2.27.0
+        with:
+          languages: ${{ matrix.language }}
+          queries: ${{ inputs.queries }}
+
+      - name: Autobuild
+        if: inputs.autobuild
+        uses: github/codeql-action/autobuild@977e6ceaea7361825998245d787fa3b4d6b9e5df # codeql-bundle-v2.27.0
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@977e6ceaea7361825998245d787fa3b4d6b9e5df # codeql-bundle-v2.27.0
+        with:
+          category: "/language:${{ matrix.language }}"
